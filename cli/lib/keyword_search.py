@@ -4,6 +4,23 @@ from .search_utils import (
     load_movies,
 )
 
+def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
+    movies = load_movies()
+    results = []
+
+    # Tokenize and normalize the query
+    query_tokens = tokenize(remove_punctuation(query.lower()))
+
+    for movie in movies:
+        # Tokenize and normalize the movie title
+        title_tokens = tokenize(remove_punctuation(movie["title"].lower()))
+
+        # Check if at least one query token matches any title token
+        if any(query_token in title_tokens for query_token in query_tokens):
+            results.append(movie)
+            if len(results) >= limit:
+                break
+    return results
 
 def remove_punctuation(text: str) -> str:
     """
@@ -25,13 +42,18 @@ def remove_punctuation(text: str) -> str:
     # Apply the translation to remove punctuation
     return text.translate(translator)
 
+def tokenize(text: str) -> list[str]:
+    """
+    Tokenize a string into words by splitting on whitespace and removing any empty tokens.
 
-def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
-    movies = load_movies()
-    results = []
-    for movie in movies:
-        if remove_punctuation(query.lower()) in remove_punctuation(movie["title"].lower()):
-            results.append(movie)
-            if len(results) >= limit:
-                break
-    return results
+    Args:
+        text: The input string to tokenize
+
+    Returns:
+        A list of words in the input string
+
+    Example:
+        >>> tokenize("Hello World")
+        ["Hello", "World"]
+    """
+    return [token for token in text.split() if token]
