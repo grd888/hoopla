@@ -45,12 +45,16 @@ class InvertedIndex:
         with open(self.docmap_path, "wb") as f:
             pickle.dump(self.docmap, f)
 
+    def load(self) -> None:
+        with open(self.index_path, "rb") as f:
+            self.index = pickle.load(f)
+        with open(self.docmap_path, "rb") as f:
+            self.docmap = pickle.load(f)
 def build_command() -> None:
     idx = InvertedIndex()
     idx.build()
     idx.save()
-    docs = idx.get_documents("merida")
-    print(f"First document for token 'merida' = {docs[0]}")
+    
 
 def preprocess_text(text: str) -> str:
     """Preprocess text by converting to lowercase and removing punctuation.
@@ -122,16 +126,15 @@ def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
     Returns:
         A list of movie dictionaries that match the search query.
     """
-    movies = load_movies()
     results = []
-
-    for movie in movies:
-        query_tokens = tokenize_text(query)
-        # Tokenize and normalize the movie title
-        title_tokens = tokenize_text(movie["title"])
-        if has_matching_token(query_tokens, title_tokens):
-            results.append(movie)
+    idx = InvertedIndex()
+    idx.load()
+    query_tokens = tokenize_text(query)
+    for token in query_tokens:
+        doc_ids = idx.get_documents(token)
+        for doc_id in doc_ids:
+            results.append(idx.docmap[doc_id])
             if len(results) >= limit:
                 return results
-              
     return results
+   
