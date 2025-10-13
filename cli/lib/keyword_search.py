@@ -1,7 +1,7 @@
 import os
 import pickle
 import string
-from collections import defaultdict
+from collections import defaultdict, Counter
 from nltk.stem import PorterStemmer
 from .search_utils import (
     CACHE_DIR,
@@ -16,13 +16,18 @@ class InvertedIndex:
         self.index = defaultdict(set)
         # dictionary mapping document IDs to their corresponding document objects
         self.docmap: dict[int, dict] = {}
+        self.term_frequencies: dict[int, Counter] = {}
         self.index_path = os.path.join(CACHE_DIR, "index.pkl")
         self.docmap_path = os.path.join(CACHE_DIR, "docmap.pkl")
+        self.term_frequencies_path = os.path.join(CACHE_DIR, "term_frequencies.pkl")
 
     def __add_document(self, doc_id: int, text: str) -> list[int]:
         tokens = tokenize_text(text)
-        for token in set(tokens):
+        if doc_id not in self.term_frequencies:
+            self.term_frequencies[doc_id] = Counter()
+        for token in tokens:
             self.index[token].add(doc_id)
+            self.term_frequencies[doc_id][token] += 1
     # get the set of documents for a given token
     # and return them as a list, sorted in ascending order
     # by document ID.
@@ -30,6 +35,8 @@ class InvertedIndex:
         doc_ids = list(self.index.get(term, set()))
         return sorted(doc_ids)
 
+    def get_tf(self, doc_id: int, term: str) -> int:
+        return self.term_frequencies.get(doc_id, {}).get(term, 0)
     def build(self) -> None:
         movies = load_movies()
         for m in movies:
@@ -44,12 +51,15 @@ class InvertedIndex:
             pickle.dump(self.index, f)
         with open(self.docmap_path, "wb") as f:
             pickle.dump(self.docmap, f)
-
+        with open(self.term_frequencies_path, "wb") as f:
+            pickle.dump(self.term_frequencies, f)
     def load(self) -> None:
         with open(self.index_path, "rb") as f:
             self.index = pickle.load(f)
         with open(self.docmap_path, "rb") as f:
             self.docmap = pickle.load(f)
+        with open(self.term_frequencies_path, "rb") as f:
+            self.term_frequencies = pickle.load(f)
 def build_command() -> None:
     idx = InvertedIndex()
     idx.build()
@@ -137,4 +147,23 @@ def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
             if len(results) >= limit:
                 return results
     return results
+
+def tf_command(doc_id: int, term: str) -> int:
+    """Get the term frequency for a term in a specific document.
+    
+    Args:
+        doc_id: The document ID to check.
+        term: The term to look up.
+        
+    Returns:
+        The term frequency count, or 0 if the term doesn't exist in the document.
+    """
+    idx = InvertedIndex()
+    idx.load()
+    # Tokenize the term to match how it's stored in the index
+    tokens = tokenize_text(term)
+    if not tokens:
+        return 0
+    # Use the first token (terms should be single words)
+    return idx.get_tf(doc_id, tokens[0])
    
