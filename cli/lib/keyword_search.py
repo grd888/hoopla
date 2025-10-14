@@ -1,6 +1,7 @@
 import os
 import pickle
 import string
+import math
 from collections import defaultdict, Counter
 from nltk.stem import PorterStemmer
 from .search_utils import (
@@ -37,6 +38,9 @@ class InvertedIndex:
 
     def get_tf(self, doc_id: int, term: str) -> int:
         return self.term_frequencies.get(doc_id, {}).get(term, 0)
+    
+    def get_idf(self, term: str) -> float:
+        return math.log((len(self.docmap) + 1) / (len(self.get_documents(term)) + 1))
     def build(self) -> None:
         movies = load_movies()
         for m in movies:
@@ -167,3 +171,12 @@ def tf_command(doc_id: int, term: str) -> int:
     # Use the first token (terms should be single words)
     return idx.get_tf(doc_id, tokens[0])
    
+def idf_command(term: str) -> float:
+    """Get the inverse document frequency for a term."""
+    idx = InvertedIndex()
+    idx.load()
+    tokens = tokenize_text(term)
+    if not tokens:
+        return 0
+    return idx.get_idf(tokens[0])
+    
