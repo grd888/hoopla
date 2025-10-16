@@ -6,6 +6,7 @@ from lib.keyword_search import (
     search_command,
     tf_command,
     idf_command,
+    tfidf_command,
 )
 
 
@@ -24,6 +25,10 @@ def main() -> None:
     
     idf_parser = subparsers.add_parser("idf", help="Get inverse document frequency for a term")
     idf_parser.add_argument("term", type=str, help="Term to look up")
+
+    tfidf_parser = subparsers.add_parser("tfidf", help="Calculate TF-IDF score for a term in a document")
+    tfidf_parser.add_argument("doc_id", type=int, help="Document ID")
+    tfidf_parser.add_argument("term", type=str, help="Term to look up")
 
     args = parser.parse_args()
 
@@ -45,7 +50,12 @@ def main() -> None:
         
         case "idf":
             idf = idf_command(args.term)
-            print(f"Inverse document frequency of '{args.term}': {idf:.2f}")            
+            print(f"Inverse document frequency of '{args.term}': {idf:.2f}")
+        
+        case "tfidf":
+            tf_idf = tfidf_command(args.doc_id, args.term)
+            print(f"TF-IDF score of '{args.term}' in document '{args.doc_id}': {tf_idf:.2f}")
+            
         case _:
             parser.exit(2, parser.format_help())
 

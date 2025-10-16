@@ -179,4 +179,24 @@ def idf_command(term: str) -> float:
     if not tokens:
         return 0
     return idx.get_idf(tokens[0])
+
+def tfidf_command(doc_id: int, term: str) -> float:
+    """Calculate the TF-IDF score for a term in a specific document.
+    
+    Args:
+        doc_id: The document ID to check.
+        term: The term to calculate TF-IDF for.
+        
+    Returns:
+        The TF-IDF score (TF * IDF).
+    """
+    idx = InvertedIndex()
+    idx.load()
+    tokens = tokenize_text(term)
+    if not tokens:
+        return 0.0
+    token = tokens[0]
+    tf = idx.get_tf(doc_id, token)
+    idf = idx.get_idf(token)
+    return tf * idf
     
