@@ -41,6 +41,28 @@ class InvertedIndex:
     
     def get_idf(self, term: str) -> float:
         return math.log((len(self.docmap) + 1) / (len(self.get_documents(term)) + 1))
+    
+    def get_bm25_idf(self, term: str) -> float:
+        """Calculate BM25 IDF score for a term.
+        
+        Args:
+            term: The term to calculate BM25 IDF for.
+            
+        Returns:
+            The BM25 IDF score using the formula: log((N - df + 0.5) / (df + 0.5) + 1)
+            
+        Raises:
+            ValueError: If the term tokenizes to more than one token.
+        """
+        tokens = tokenize_text(term)
+        if len(tokens) != 1:
+            raise ValueError(f"Term must be a single token, got {len(tokens)} tokens")
+        
+        token = tokens[0]
+        N = len(self.docmap)
+        df = len(self.get_documents(token))
+        
+        return math.log((N - df + 0.5) / (df + 0.5) + 1)
     def build(self) -> None:
         movies = load_movies()
         for m in movies:
@@ -199,4 +221,17 @@ def tfidf_command(doc_id: int, term: str) -> float:
     tf = idx.get_tf(doc_id, token)
     idf = idx.get_idf(token)
     return tf * idf
+
+def bm25_idf_command(term: str) -> float:
+    """Get the BM25 IDF score for a term.
+    
+    Args:
+        term: The term to calculate BM25 IDF for.
+        
+    Returns:
+        The BM25 IDF score.
+    """
+    idx = InvertedIndex()
+    idx.load()
+    return idx.get_bm25_idf(term)
     

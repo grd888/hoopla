@@ -7,6 +7,7 @@ from lib.keyword_search import (
     tf_command,
     idf_command,
     tfidf_command,
+    bm25_idf_command,
 )
 
 
@@ -29,6 +30,11 @@ def main() -> None:
     tfidf_parser = subparsers.add_parser("tfidf", help="Calculate TF-IDF score for a term in a document")
     tfidf_parser.add_argument("doc_id", type=int, help="Document ID")
     tfidf_parser.add_argument("term", type=str, help="Term to look up")
+
+    bm25_idf_parser = subparsers.add_parser(
+        'bm25idf', help="Get BM25 IDF score for a given term"
+    )
+    bm25_idf_parser.add_argument("term", type=str, help="Term to get BM25 IDF score for")
 
     args = parser.parse_args()
 
@@ -55,6 +61,10 @@ def main() -> None:
         case "tfidf":
             tf_idf = tfidf_command(args.doc_id, args.term)
             print(f"TF-IDF score of '{args.term}' in document '{args.doc_id}': {tf_idf:.2f}")
+        
+        case "bm25idf":
+            bm25idf = bm25_idf_command(args.term)
+            print(f"BM25 IDF score of '{args.term}': {bm25idf:.2f}")
             
         case _:
             parser.exit(2, parser.format_help())
