@@ -1,12 +1,15 @@
+import math
 import os
 import pickle
 import string
-import math
 from collections import defaultdict, Counter
+
 from nltk.stem import PorterStemmer
+
 from .search_utils import (
     CACHE_DIR,
     DEFAULT_SEARCH_LIMIT,
+    BM25_K1,
     load_movies,
     load_stopwords
 )
@@ -17,18 +20,16 @@ class InvertedIndex:
         self.index = defaultdict(set)
         # dictionary mapping document IDs to their corresponding document objects
         self.docmap: dict[int, dict] = {}
-        self.term_frequencies: dict[int, Counter] = {}
+        self.term_frequencies: defaultdict(Counter)
         self.index_path = os.path.join(CACHE_DIR, "index.pkl")
         self.docmap_path = os.path.join(CACHE_DIR, "docmap.pkl")
         self.term_frequencies_path = os.path.join(CACHE_DIR, "term_frequencies.pkl")
 
-    def __add_document(self, doc_id: int, text: str) -> list[int]:
+    def __add_document(self, doc_id: int, text: str) -> None:
         tokens = tokenize_text(text)
-        if doc_id not in self.term_frequencies:
-            self.term_frequencies[doc_id] = Counter()
-        for token in tokens:
+        for token in set(tokens):
             self.index[token].add(doc_id)
-            self.term_frequencies[doc_id][token] += 1
+        self.term_frequencies[doc_id].update(tokens)
     # get the set of documents for a given token
     # and return them as a list, sorted in ascending order
     # by document ID.
@@ -37,10 +38,22 @@ class InvertedIndex:
         return sorted(doc_ids)
 
     def get_tf(self, doc_id: int, term: str) -> int:
-        return self.term_frequencies.get(doc_id, {}).get(term, 0)
+        tokens = tokenize_text(term)
+        if len(tokens) != 1:
+            raise ValueError(f"Term must be a single token, got {len(tokens)} tokens")
+        
+        token = tokens[0]
+        return self.term_frequencies[doc_id][token]
     
     def get_idf(self, term: str) -> float:
-        return math.log((len(self.docmap) + 1) / (len(self.get_documents(term)) + 1))
+        tokens = tokenize_text(term)
+        if len(tokens) != 1:
+            raise ValueError(f"Term must be a single token, got {len(tokens)} tokens")
+        
+        token = tokens[0]
+        doc_count = len(self.docmap)
+        term_doc_count = len(self.index[token])
+        return math.log((doc_count + 1) / (term_doc_count + 1))
     
     def get_bm25_idf(self, term: str) -> float:
         """Calculate BM25 IDF score for a term.
@@ -59,10 +72,20 @@ class InvertedIndex:
             raise ValueError(f"Term must be a single token, got {len(tokens)} tokens")
         
         token = tokens[0]
-        N = len(self.docmap)
-        df = len(self.get_documents(token))
-        
-        return math.log((N - df + 0.5) / (df + 0.5) + 1)
+        doc_count = len(self.docmap)
+        term_doc_count = len(self.index[token])
+        return math.log((doc_count - term_doc_count + 0.5) / (term_doc_count + 0.5) + 1)
+
+    
+    def get_bm25_tf(self, doc_id: int, term: str, k1: float = BM25_K1) -> float:
+        tf = self.get_tf(doc_id, term)
+        return (tf * (k1 + 1)) / (tf + k1)
+    
+    def get_tf_idf(self, doc_id: int, term: str) -> float:
+        tf = self.get_tf(doc_id, term)
+        idf = self.get_idf(term)
+        return tf * idf
+    
     def build(self) -> None:
         movies = load_movies()
         for m in movies:
@@ -79,6 +102,7 @@ class InvertedIndex:
             pickle.dump(self.docmap, f)
         with open(self.term_frequencies_path, "wb") as f:
             pickle.dump(self.term_frequencies, f)
+            
     def load(self) -> None:
         with open(self.index_path, "rb") as f:
             self.index = pickle.load(f)
@@ -214,13 +238,7 @@ def tfidf_command(doc_id: int, term: str) -> float:
     """
     idx = InvertedIndex()
     idx.load()
-    tokens = tokenize_text(term)
-    if not tokens:
-        return 0.0
-    token = tokens[0]
-    tf = idx.get_tf(doc_id, token)
-    idf = idx.get_idf(token)
-    return tf * idf
+    return idx.get_tf_idf(doc_id, term)
 
 def bm25_idf_command(term: str) -> float:
     """Get the BM25 IDF score for a term.
@@ -234,4 +252,9 @@ def bm25_idf_command(term: str) -> float:
     idx = InvertedIndex()
     idx.load()
     return idx.get_bm25_idf(term)
+
+def bm25_tf_command(doc_id: int, term: str, k1: float = BM25_K1) -> float:
+    idx = InvertedIndex()
+    idx.load()
+    return idx.get_bm25_tf(doc_id, term, k1)
     
