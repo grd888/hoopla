@@ -98,6 +98,21 @@ class InvertedIndex:
         idf = self.get_idf(term)
         return tf * idf
     
+    def bm25(self, doc_id, term):
+        idf = self.get_bm25_idf(term)
+        tf = self.get_bm25_tf(doc_id, term)
+        return idf * tf
+    
+    def bm25_search(self, query, limit):
+        query_tokens = tokenize_text(query)
+        scores = {}
+        for doc_id in self.docmap:
+            score = 0
+            for token in query_tokens:
+                score += self.bm25(doc_id, token)
+            scores[doc_id] = score
+        return sorted(scores.items(), key=lambda x: x[1], reverse=True)[:limit]
+    
     def build(self) -> None:
         movies = load_movies()
         for m in movies:
@@ -274,4 +289,18 @@ def bm25_tf_command(doc_id: int, term: str, k1: float = BM25_K1, b: float = BM25
     idx = InvertedIndex()
     idx.load()
     return idx.get_bm25_tf(doc_id, term, k1, b)
+
+def bm25_search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[tuple[int, float]]:
+    """Search for movies using BM25 scoring.
+    
+    Args:
+        query: The search query string.
+        limit: Maximum number of results to return. Defaults to DEFAULT_SEARCH_LIMIT.
+        
+    Returns:
+        A list of tuples containing (doc_id, score) sorted by score in descending order.
+    """
+    idx = InvertedIndex()
+    idx.load()
+    return idx.bm25_search(query, limit)
     

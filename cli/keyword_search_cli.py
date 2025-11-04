@@ -9,6 +9,8 @@ from lib.keyword_search import (
     tfidf_command,
     bm25_idf_command,
     bm25_tf_command,
+    bm25_search_command,
+    InvertedIndex,
 )
 from lib.search_utils import (BM25_K1, BM25_B)
 
@@ -21,6 +23,9 @@ def main() -> None:
 
     search_parser = subparsers.add_parser("search", help="Search movies using BM25")
     search_parser.add_argument("query", type=str, help="Search query")
+    bm25search_parser = subparsers.add_parser("bm25search", help="Search movies using full BM25 scoring")
+    bm25search_parser.add_argument("query", type=str, help="Search query")
+    bm25search_parser.add_argument("--limit", type=int, default=5, help="Maximum number of results to return (default: 5)")
 
     tf_parser = subparsers.add_parser("tf", help="Get term frequency for a term in a document")
     tf_parser.add_argument("doc_id", type=int, help="Document ID")
@@ -58,6 +63,15 @@ def main() -> None:
             results = search_command(args.query)
             for i, res in enumerate(results, 1):
                 print(f"{i}. ({res['id']}) {res['title']}")
+        
+        case "bm25search":
+            print(f"Searching for: {args.query}")
+            results = bm25_search_command(args.query, args.limit)
+            idx = InvertedIndex()
+            idx.load()
+            for i, (doc_id, score) in enumerate(results, 1):
+                title = idx.docmap[doc_id]['title']
+                print(f"{i}. ({doc_id}) {title} - Score: {score:.2f}")
                 
         case "tf":
             tf = tf_command(args.doc_id, args.term)
