@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 
 import argparse
-from lib.semantic_search import verify_model, embed_text, verify_embeddings, embed_query_text, semantic_search
+from lib.semantic_search import (
+    verify_model,
+    embed_text,
+    verify_embeddings,
+    embed_query_text,
+    semantic_search,
+    chunk_text,
+)
 
 
 def main():
@@ -9,18 +16,36 @@ def main():
     subparsers = parser.add_subparsers(dest="command")
 
     subparsers.add_parser("verify", help="Verify the model is loaded correctly")
-    
-    embed_parser = subparsers.add_parser("embed_text", help="Generate an embedding for a single text string")
+
+    embed_parser = subparsers.add_parser(
+        "embed_text", help="Generate an embedding for a single text string"
+    )
     embed_parser.add_argument("text", type=str, help="Text to embed")
-    
-    embed_query_parser = subparsers.add_parser("embedquery", help="Generate an embedding for a single query string")
+
+    embed_query_parser = subparsers.add_parser(
+        "embedquery", help="Generate an embedding for a single query string"
+    )
     embed_query_parser.add_argument("query", type=str, help="Query to embed")
-    subparsers.add_parser("verify_embeddings", help="Verify the embeddings are loaded correctly")
-    
-    search_parser = subparsers.add_parser("search", help="Search for documents similar to a query")
+    subparsers.add_parser(
+        "verify_embeddings", help="Verify the embeddings are loaded correctly"
+    )
+
+    search_parser = subparsers.add_parser(
+        "search", help="Search for documents similar to a query"
+    )
     search_parser.add_argument("query", type=str, help="Query to search for")
-    search_parser.add_argument("--limit", type=int, help="Number of results to return", default=5)
-    
+    search_parser.add_argument(
+        "--limit", type=int, help="Number of results to return", default=5
+    )
+
+    chunk_parser = subparsers.add_parser(
+        "chunk", help="Chunk a text string into smaller segments"
+    )
+    chunk_parser.add_argument("text", type=str, help="Text to chunk")
+    chunk_parser.add_argument(
+        "--chunk-size", type=int, help="Size of each chunk", default=200
+    )
+
     args = parser.parse_args()
 
     match args.command:
@@ -33,7 +58,9 @@ def main():
         case "verify_embeddings":
             verify_embeddings()
         case "search":
-            semantic_search(args.query, args.limit)    
+            semantic_search(args.query, args.limit)
+        case "chunk":
+            chunk_text(args.text, args.chunk_size)
         case _:
             parser.print_help()
 
