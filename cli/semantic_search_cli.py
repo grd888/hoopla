@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
-from lib.semantic_search import verify_model, embed_text, verify_embeddings, embed_query_text
+from lib.semantic_search import verify_model, embed_text, verify_embeddings, embed_query_text, semantic_search
 
 
 def main():
@@ -17,6 +17,10 @@ def main():
     embed_query_parser.add_argument("query", type=str, help="Query to embed")
     subparsers.add_parser("verify_embeddings", help="Verify the embeddings are loaded correctly")
     
+    search_parser = subparsers.add_parser("search", help="Search for documents similar to a query")
+    search_parser.add_argument("query", type=str, help="Query to search for")
+    search_parser.add_argument("--limit", type=int, help="Number of results to return", default=5)
+    
     args = parser.parse_args()
 
     match args.command:
@@ -28,6 +32,8 @@ def main():
             embed_query_text(args.query)
         case "verify_embeddings":
             verify_embeddings()
+        case "search":
+            semantic_search(args.query, args.limit)    
         case _:
             parser.print_help()
 

@@ -24,12 +24,33 @@ class SemanticSearch:
     return self.embeddings
   
   def load_or_create_embeddings(self, documents):
+    self.documents = documents
+    self.document_map = {}
+    
+    for doc in documents:
+      self.document_map[doc["id"]] = doc
+    
     if os.path.exists("cache/movie_embeddings.npy"):
       self.embeddings = np.load("cache/movie_embeddings.npy")
       if len(self.embeddings) == len(documents):
         return self.embeddings
       
     return self.build_embeddings(documents)
+  
+  def search(self, query, limit):
+    if self.embeddings is None or self.embeddings.size == 0:
+      raise ValueError("No embeddings loaded. Call `load_or_create_embeddings` first.")
+    if self.documents is None or len(self.documents) == 0:
+      raise ValueError("No documents loaded. Call `load_or_create_embeddings` first.")
+    
+    query_embedding = self.generate_embedding(query)
+    scores = []
+    for index, embedding in enumerate(self.embeddings):
+      similarity = cosine_similarity(embedding, query_embedding)
+      scores.append((similarity, self.documents[index]))
+    
+    scores.sort(key=lambda x: x[0], reverse=True)
+    return [{"score": score, "title": doc["title"], "description": doc["description"]} for score, doc in scores[:limit]]
     
 def verify_model():
   semantic_search = SemanticSearch()
@@ -56,4 +77,22 @@ def verify_embeddings():
   embeddings = semantic_search.load_or_create_embeddings(documents)
   print(f"Number of docs:   {len(documents)}")
   print(f"Embeddings shape: {embeddings.shape[0]} vectors in {embeddings.shape[1]} dimensions")
+  
+def cosine_similarity(vec1, vec2):
+    dot_product = np.dot(vec1, vec2)
+    norm1 = np.linalg.norm(vec1)
+    norm2 = np.linalg.norm(vec2)
+
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+
+    return dot_product / (norm1 * norm2)
+  
+def semantic_search(query, limit):
+  semantic_search = SemanticSearch()
+  documents = load_movies()
+  semantic_search.load_or_create_embeddings(documents)
+  results = semantic_search.search(query, limit)
+  for index, result in enumerate(results):
+    print(f"{index + 1}. {result['title']} ({result['score']:.4f})\n{result['description']}\n")
   
