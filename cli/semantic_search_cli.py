@@ -45,6 +45,9 @@ def main():
     chunk_parser.add_argument(
         "--chunk-size", type=int, help="Size of each chunk", default=200
     )
+    chunk_parser.add_argument(
+        "--overlap", type=int, help="Number of words to overlap between chunks", default=40
+    )
 
     args = parser.parse_args()
 
@@ -60,7 +63,7 @@ def main():
         case "search":
             semantic_search(args.query, args.limit)
         case "chunk":
-            chunk_text(args.text, args.chunk_size)
+            chunk_text(args.text, args.chunk_size, args.overlap)
         case _:
             parser.print_help()
 
