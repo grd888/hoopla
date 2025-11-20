@@ -9,6 +9,7 @@ from lib.semantic_search import (
     semantic_search,
     chunk_text,
     semantic_chunk_text,
+    embed_chunks,
 )
 
 
@@ -61,6 +62,10 @@ def main():
         "--overlap", type=int, help="Number of words to overlap between chunks", default=0
     )
 
+    subparsers.add_parser(
+        "embed_chunks", help="Generate embeddings for a list of documents"
+    )
+
     args = parser.parse_args()
 
     match args.command:
@@ -78,6 +83,8 @@ def main():
             chunk_text(args.text, args.chunk_size, args.overlap)
         case "semantic_chunk":
             semantic_chunk_text(args.text, args.max_chunk_size, args.overlap)
+        case "embed_chunks":
+            embed_chunks()
         case _:
             parser.print_help()
 
