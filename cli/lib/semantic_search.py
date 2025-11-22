@@ -209,8 +209,18 @@ def chunk_text(text: str, chunk_size: int = 200, overlap: int = 40) -> list[str]
     return chunks
 
 def semantic_chunk_text(text: str, max_chunk_size: int = 200, overlap: int = 40) -> list[str]:
+    text = text.strip()
+    if not text:
+        return []
+
     pattern = r"(?<=[.!?])\s+"
     sentences = [s for s in re.split(pattern, text) if s.strip()]
+    
+    if len(sentences) == 1 and not re.search(r"[.!?]$", sentences[0]):
+        sentences = [text]
+
+    sentences = [s.strip() for s in sentences if s.strip()]
+
     # Each chunk should contain up to max_chunk_size sentences.
     # Support overlap by number of sentences.
     chunks = []
