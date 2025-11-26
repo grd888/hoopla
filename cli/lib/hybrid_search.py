@@ -1,39 +1,107 @@
-import os 
+import os
 
 from .keyword_search import InvertedIndex
 from .semantic_search import ChunkedSemanticSearch
 
+
 class HybridSearch:
-  def __init__(self, documents):
-    self.documents = documents
-    self.semantic_search = ChunkedSemanticSearch()
-    self.semantic_search.load_or_create_chunk_embeddings(documents)
-    self.idx = InvertedIndex()
+    def __init__(self, documents):
+        self.documents = documents
+        self.semantic_search = ChunkedSemanticSearch()
+        self.semantic_search.load_or_create_chunk_embeddings(documents)
+        self.idx = InvertedIndex()
 
-    if not os.path.exists(self.idx.index_path):
-      self.idx.build()
-      self.idx.save()
+        if not os.path.exists(self.idx.index_path):
+            self.idx.build()
+            self.idx.save()
 
-  def _bm25_search(self, query, limit):
-    self.idx.load()
-    return self.idx.bm25_search(query, limit)
+    def _bm25_search(self, query, limit):
+        self.idx.load()
+        return self.idx.bm25_search(query, limit)
 
-  def weighted_search(self, query, alpha, limit=5):
-    raise NotImplementedError("Weighted hybrid search is not implemented yet")
+    def weighted_search(self, query, alpha, limit=5):
+        # Get 500x the limit to ensure enough results to work with
+        bm25_results = self._bm25_search(query, limit * 500)
+        semantic_results = self.semantic_search.search_chunks(query, limit * 500)
 
-  def rrf_search(self, query, limit=10):
-    raise NotImplementedError("RRF hybrid search is not implemented yet")
+        # Extract scores for normalization
+        bm25_scores = [score for _, score in bm25_results]
+        semantic_scores = [result["score"] for result in semantic_results]
+
+        # Normalize scores
+        bm25_normalized = normalize(bm25_scores)
+        semantic_normalized = normalize(semantic_scores)
+
+        # Create dictionary mapping doc IDs to documents and scores
+        doc_scores = {}
+
+        # Add BM25 results
+        for i, (doc_id, _) in enumerate(bm25_results):
+            doc_scores[doc_id] = {
+                "document": self.idx.docmap[doc_id],
+                "keyword_score": bm25_normalized[i] if bm25_normalized else 0.0,
+                "semantic_score": 0.0,
+            }
+
+        # Add semantic results
+        for i, result in enumerate(semantic_results):
+            doc_id = result["id"]
+            if doc_id in doc_scores:
+                doc_scores[doc_id]["semantic_score"] = (
+                    semantic_normalized[i] if semantic_normalized else 0.0
+                )
+            else:
+                doc_scores[doc_id] = {
+                    "document": self.documents[
+                        next(
+                            j for j, d in enumerate(self.documents) if d["id"] == doc_id
+                        )
+                    ],
+                    "keyword_score": 0.0,
+                    "semantic_score": semantic_normalized[i]
+                    if semantic_normalized
+                    else 0.0,
+                }
+
+        # Calculate hybrid score for each document
+        for doc_id in doc_scores:
+            doc_scores[doc_id]["hybrid_score"] = hybrid_score(
+                doc_scores[doc_id]["keyword_score"],
+                doc_scores[doc_id]["semantic_score"],
+                alpha,
+            )
+
+        # Sort by hybrid score descending and return top results
+        sorted_results = sorted(
+            doc_scores.items(), key=lambda x: x[1]["hybrid_score"], reverse=True
+        )[:limit]
+
+        return [
+            {
+                "id": doc_id,
+                "document": data["document"],
+                "keyword_score": data["keyword_score"],
+                "semantic_score": data["semantic_score"],
+                "hybrid_score": data["hybrid_score"],
+            }
+            for doc_id, data in sorted_results
+        ]
+
+    def rrf_search(self, query, limit=10):
+        raise NotImplementedError("RRF hybrid search is not implemented yet")
+
+
+def hybrid_score(keyword_score, semantic_score, alpha):
+    return alpha * keyword_score + (1 - alpha) * semantic_score
+
 
 def normalize(scores):
-  if len(scores) == 0:
-    return
-  if min(scores) == max(scores):
-    # print a list of 1.0 values with the same length as scores
-    print([1.0] * len(scores))
-  else:
-    min_score = min(scores)
-    max_score = max(scores)
-    range_score = max_score - min_score
-    normalized_scores = list(map(lambda x: (x - min_score) / range_score, scores)) 
-    for score in normalized_scores:
-      print(f"* {score:.4f}")
+    if len(scores) == 0:
+        return []
+    if min(scores) == max(scores):
+        return [1.0] * len(scores)
+    else:
+        min_score = min(scores)
+        max_score = max(scores)
+        range_score = max_score - min_score
+        return list(map(lambda x: (x - min_score) / range_score, scores))
