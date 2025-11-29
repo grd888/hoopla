@@ -31,6 +31,9 @@ def main() -> None:
     rrf_search_parser.add_argument(
         "--k", type=int, help="Number of results to return", default=60
     )
+    rrf_search_parser.add_argument(
+        "--enhance", type=str, choices=["spell"], help="Query enhancement method",
+    )
 
     args = parser.parse_args()
 
@@ -48,7 +51,7 @@ def main() -> None:
         case "rrf-search":
             movies = load_movies()
             hybrid_search = HybridSearch(movies)
-            results = hybrid_search.rrf_search(args.query, args.k, args.limit)
+            results = hybrid_search.rrf_search(args.query, args.k, args.limit, args.enhance)
             for i, result in enumerate(results, 1):
                 title = result["document"]["title"]
                 rrf_score = result["rrf_score"]

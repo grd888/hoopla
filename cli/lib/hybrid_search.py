@@ -2,7 +2,7 @@ import os
 
 from .keyword_search import InvertedIndex
 from .semantic_search import ChunkedSemanticSearch
-
+from .query_enhancement import enhance_query
 
 class HybridSearch:
     def __init__(self, documents):
@@ -87,7 +87,12 @@ class HybridSearch:
             for doc_id, data in sorted_results
         ]
 
-    def rrf_search(self, query, k=60,limit=10):
+    def rrf_search(self, query, k=60,limit=10, enhance=None):
+        if enhance == "spell":
+          enhanced_query = enhance_query(query, "spell")
+          print(f"Enhanced query ({enhance}): '{query}' -> '{enhanced_query}'\n")
+          query = enhanced_query
+
         bm25_results = self._bm25_search(query, limit * 500)
         semantic_results = self.semantic_search.search_chunks(query, limit * 500)
 
