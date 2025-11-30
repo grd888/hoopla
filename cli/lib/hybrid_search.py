@@ -88,7 +88,7 @@ class HybridSearch:
         ]
 
     def rrf_search(self, query, k=60,limit=10, enhance=None):
-        if enhance in ["spell", "rewrite"]:
+        if enhance in ["spell", "rewrite", "expand"]:
             enhanced_query = enhance_query(query, enhance)
             print(f"Enhanced query ({enhance}): '{query}' -> '{enhanced_query}'\n")
             query = enhanced_query
