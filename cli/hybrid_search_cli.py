@@ -32,7 +32,7 @@ def main() -> None:
         "--k", type=int, help="Number of results to return", default=60
     )
     rrf_search_parser.add_argument(
-        "--enhance", type=str, choices=["spell"], help="Query enhancement method",
+        "--enhance", type=str, choices=["spell", "rewrite"], help="Query enhancement method",
     )
 
     args = parser.parse_args()
