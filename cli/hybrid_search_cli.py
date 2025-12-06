@@ -32,7 +32,16 @@ def main() -> None:
         "--k", type=int, help="Number of results to return", default=60
     )
     rrf_search_parser.add_argument(
-        "--enhance", type=str, choices=["spell", "rewrite", "expand"], help="Query enhancement method",
+        "--enhance",
+        type=str,
+        choices=["spell", "rewrite", "expand"],
+        help="Query enhancement method",
+    )
+    rrf_search_parser.add_argument(
+        "--rerank-method",
+        type=str,
+        choices=["individual"],
+        help="Query reranking method",
     )
 
     args = parser.parse_args()
@@ -51,7 +60,12 @@ def main() -> None:
         case "rrf-search":
             movies = load_movies()
             hybrid_search = HybridSearch(movies)
-            results = hybrid_search.rrf_search(args.query, args.k, args.limit, args.enhance)
+            results = hybrid_search.rrf_search(
+                args.query, args.k, args.limit, args.enhance, args.rerank_method
+            )
+
+            print(f"Reciprocal Rank Fusion Results for '{args.query}' (k={args.k}):\n")
+
             for i, result in enumerate(results, 1):
                 title = result["document"]["title"]
                 rrf_score = result["rrf_score"]
@@ -59,6 +73,8 @@ def main() -> None:
                 semantic_rank = result["semantic_rank"]
                 overview = result["document"]["description"][:100] + "..."
                 print(f"{i}. {title}")
+                if "rerank_score" in result:
+                    print(f"   Rerank Score: {result['rerank_score']:.3f}/10")
                 print(f"   RRF Score: {rrf_score:.3f}")
                 print(f"   BM25 Rank: {bm25_rank}, Semantic Rank: {semantic_rank}")
                 print(f"   {overview}")

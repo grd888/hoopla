@@ -1,8 +1,18 @@
 import os
+import time
+
+from dotenv import load_dotenv
+from google import genai
 
 from .keyword_search import InvertedIndex
 from .semantic_search import ChunkedSemanticSearch
 from .query_enhancement import enhance_query
+
+load_dotenv()
+api_key = os.getenv("gemini_api_key")
+client = genai.Client(api_key=api_key)
+model = "gemini-2.0-flash"
+
 
 class HybridSearch:
     def __init__(self, documents):
@@ -87,20 +97,23 @@ class HybridSearch:
             for doc_id, data in sorted_results
         ]
 
-    def rrf_search(self, query, k=60,limit=10, enhance=None):
+    def rrf_search(self, query, k=60, limit=10, enhance=None, rerank_method=None):
         if enhance in ["spell", "rewrite", "expand"]:
             enhanced_query = enhance_query(query, enhance)
             print(f"Enhanced query ({enhance}): '{query}' -> '{enhanced_query}'\n")
             query = enhanced_query
 
-        bm25_results = self._bm25_search(query, limit * 500)
-        semantic_results = self.semantic_search.search_chunks(query, limit * 500)
+        # Gather 5x results if reranking
+        search_limit = limit * 5 if rerank_method == "individual" else limit
+
+        bm25_results = self._bm25_search(query, search_limit * 500)
+        semantic_results = self.semantic_search.search_chunks(query, search_limit * 500)
 
         sorted_bm25_results = sorted(bm25_results, key=lambda x: x[1], reverse=True)
         sorted_semantic_results = sorted(
             semantic_results, key=lambda x: x["score"], reverse=True
         )
-        
+
         # Create a dictionary mapping document IDs to the documents themselves and their BM25 and semantic ranks (not scores)
         doc_ranks = {}
         for i, (doc_id, _) in enumerate(sorted_bm25_results):
@@ -133,7 +146,7 @@ class HybridSearch:
         # Sort by RRF score descending and return top results
         sorted_results = sorted(
             doc_ranks.items(), key=lambda x: x[1]["rrf_score"], reverse=True
-        )[:limit]
+        )[:search_limit]
 
         results = [
             {
@@ -145,7 +158,43 @@ class HybridSearch:
             }
             for doc_id, data in sorted_results
         ]
-        
+
+        # Apply reranking if method is specified
+        if rerank_method == "individual":
+            print(f"Reranking top {limit} results using individual method...")
+            results = self._rerank_individual(query, results, limit)
+
+        return results[:limit]
+
+    def _rerank_individual(self, query, results, limit):
+        """Rerank results using individual LLM prompts for each document."""
+        for result in results:
+            doc = result["document"]
+            prompt = f"""Rate how well this movie matches the search query.
+
+Query: "{query}"
+Movie: {doc.get("title", "")} - {doc.get("description", "")}
+
+Consider:
+- Direct relevance to query
+- User intent (what they're looking for)
+- Content appropriateness
+
+Rate 0-10 (10 = perfect match).
+Give me ONLY the number in your response, no other text or explanation.
+
+Score:"""
+            response = client.models.generate_content(model=model, contents=prompt)
+            try:
+                score = float((response.text or "0").strip())
+                result["rerank_score"] = min(max(score, 0), 10)  # Clamp to 0-10
+            except ValueError:
+                result["rerank_score"] = 0.0
+
+            time.sleep(3)  # Avoid rate limiting
+
+        # Sort by rerank score descending
+        results.sort(key=lambda x: x.get("rerank_score", 0), reverse=True)
         return results[:limit]
 
 
@@ -163,6 +212,7 @@ def normalize(scores):
         max_score = max(scores)
         range_score = max_score - min_score
         return list(map(lambda x: (x - min_score) / range_score, scores))
-      
+
+
 def rrf_score(rank, k=60):
     return 1 / (k + rank)
